@@ -70,6 +70,17 @@ func GetRegion() (string, error) {
 type logger struct {
 	logger *log.Logger
 }
+var customLogger aws.Logger
+
+func init() {
+	SetLogger(log.New(os.Stderr, "", log.LstdFlags))
+}
+
+func SetLogger(l *log.Logger) {
+	customLogger = logger{
+		logger: l,
+	}
+}
 
 func (l logger) Log(args ...interface{}) {
 	l.logger.Println(args...)
@@ -77,9 +88,7 @@ func (l logger) Log(args ...interface{}) {
 
 // GetLogger gets a logger that can be used with the AWS SDK.
 func GetLogger() aws.Logger {
-	return &logger{
-		logger: log.New(os.Stderr, "", log.LstdFlags),
-	}
+	return customLogger
 }
 
 // GetService returns a new EC2 service
@@ -109,7 +118,6 @@ func GetInstance(service *ec2.EC2, instanceID string) (*ec2.Instance, error) {
 
 // GetSession returns an AWS session pointer given an options config struct
 func GetSession(o Options) *session.Session {
-
 	providers := []credentials.Provider{
 		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.Must(session.NewSession()))},
 		&credentials.EnvProvider{},

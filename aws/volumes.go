@@ -5,7 +5,6 @@ import (
 	"errors"
 	"path/filepath"
 	"io/ioutil"
-	"log"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	_aws "github.com/aws/aws-sdk-go/aws"
 )
@@ -44,8 +43,12 @@ func GetAttachedVolumes(e *ec2.EC2, instanceID string) ([]VolumeInfo, error) {
 			for _,tag := range volume.Tags {
 				tags[*tag.Key] = *tag.Value
 			}
+			device, err := getDevice(*volume.Attachments[0].Device)
+			if err != nil {
+				return results, err
+			}
 			v := VolumeInfo {
-				Device: getDevice(*volume.Attachments[0].Device),
+				Device: device,
 				State: *volume.Attachments[0].State,
 				InstanceID: *volume.Attachments[0].InstanceId,
 				VolumeID: *volume.Attachments[0].VolumeId,
@@ -62,7 +65,7 @@ func localDevicePrefix() (string, error) {
 
 	f, err := ioutil.ReadDir("/sys/block")
 	if err != nil {
-		log.Fatal(err)
+		return "sd", err
 	}
 	for _, d := range f {
 		base := filepath.Base(d.Name())
@@ -76,19 +79,22 @@ func localDevicePrefix() (string, error) {
 	return "", errors.New("device prefix could not be detected")
 }
 
-func getDevice(device string) string {
-	prefix, _ := localDevicePrefix()
+func getDevice(device string) (string, error) {
+	prefix, err := localDevicePrefix()
+	if err != nil {
+		return device, err
+	}
 	d := filepath.Base(device)
 	if d == "sda1" && prefix == "xvd" {
 		d = "xvda"
 	}
 	if strings.HasPrefix(d, "sd") {
-		return prefix + d[2:]
+		return prefix + d[2:], nil
 	}
 
 	if strings.HasPrefix(d, "xvd") {
-		return prefix + d[3:]
+		return prefix + d[3:], nil
 	}
 
-	return device
+	return device, nil
 }
