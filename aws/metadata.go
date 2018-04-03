@@ -18,6 +18,37 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
+const (
+    // LogOff states that no logging should be performed by the SDK. This is the
+    // default state of the SDK, and should be use to disable all logging.
+    LogOff = aws.LogOff
+
+    // LogDebug state that debug output should be logged by the SDK. This should
+    // be used to inspect request made and responses received.
+    LogDebug = aws.LogDebug
+)
+const (
+    // LogDebugWithSigning states that the SDK should log request signing and
+    // presigning events. This should be used to log the signing details of
+    // requests for debugging. Will also enable LogDebug.
+    LogDebugWithSigning = aws.LogDebugWithSigning
+
+    // LogDebugWithHTTPBody states the SDK should log HTTP request and response
+    // HTTP bodys in addition to the headers and path. This should be used to
+    // see the body content of requests and responses made while using the SDK
+    // Will also enable LogDebug.
+    LogDebugWithHTTPBody = aws.LogDebugWithHTTPBody
+
+    // LogDebugWithRequestRetries states the SDK should log when service requests will
+    // be retried. This should be used to log when you want to log when service
+    // requests are being retried. Will also enable LogDebug.
+    LogDebugWithRequestRetries = aws.LogDebugWithRequestRetries
+
+    // LogDebugWithRequestErrors states the SDK should log when service requests fail
+    // to build, send, validate, or unmarshal.
+    LogDebugWithRequestErrors = aws.LogDebugWithRequestRetries
+)
+
 // Options contain the options for aws plugin
 type Options struct {
 	Region          string
@@ -25,6 +56,7 @@ type Options struct {
 	SecretAccessKey string
 	SessionToken    string
 	Retries         int
+	LogLevel		aws.LogLevelType
 }
 
 // MetadataKey is the identifier of a metadata entry
@@ -67,22 +99,20 @@ func GetRegion() (string, error) {
 	return az[0 : len(az)-1], nil
 }
 
-type logger struct {
-	logger *log.Logger
-}
 var customLogger aws.Logger
-
 func init() {
-	SetLogger(log.New(os.Stderr, "", log.LstdFlags))
+	SetLogger(defaultLogger{logger: log.New(os.Stderr, "", log.LstdFlags)})
 }
 
-func SetLogger(l *log.Logger) {
-	customLogger = logger{
-		logger: l,
-	}
+func SetLogger(l aws.Logger) {
+	customLogger = l
 }
 
-func (l logger) Log(args ...interface{}) {
+type defaultLogger struct {
+	logger* log.Logger
+}
+
+func (l defaultLogger) Log(args ...interface{}) {
 	l.logger.Println(args...)
 }
 
@@ -139,7 +169,8 @@ func GetSession(o Options) *session.Session {
 	region, _ := GetRegion()
 	config := aws.NewConfig().WithRegion(region).WithLogger(GetLogger()).
 				WithMaxRetries(11).
-				WithCredentialsChainVerboseErrors(true).WithCredentials(creds)
+				WithCredentialsChainVerboseErrors(true).WithCredentials(creds).
+				WithLogLevel(aws.LogLevelType(o.LogLevel))
 	opts := session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 		Config:            *config,
