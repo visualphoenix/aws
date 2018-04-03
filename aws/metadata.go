@@ -111,7 +111,7 @@ func GetInstance(service *ec2.EC2, instanceID string) (*ec2.Instance, error) {
 func GetSession(o Options) *session.Session {
 
 	providers := []credentials.Provider{
-		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
+		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.Must(session.NewSession()))},
 		&credentials.EnvProvider{},
 		&credentials.SharedCredentialsProvider{},
 	}

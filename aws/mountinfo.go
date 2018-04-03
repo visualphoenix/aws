@@ -80,27 +80,31 @@ func GetMountInfoFrom(service *ec2.EC2, instanceID string) ([]MountInfo, error) 
 }
 
 // Suspend writes to the device/partition given the type of the mount
-func (mi MountInfo) Suspend() {
+func (mi MountInfo) Suspend() error {
+	var err error
 	switch mi.BlockDeviceType {
 	case "disk":
 		fallthrough
 	case "part":
-		fs.Freeze(mi.Mountpoint)
+		err = fs.Freeze(mi.Mountpoint)
 	case "lvm":
-		lvm.Suspend(mi.BlockDevice)
+		err = lvm.Suspend(mi.BlockDevice)
 	default:
 	}
+	return err
 }
 
 // Resume writes to the device/partition given the type of the mount
-func (mi MountInfo) Resume() {
+func (mi MountInfo) Resume() error {
+	var err error
 	switch mi.BlockDeviceType {
 	case "disk":
 		fallthrough
 	case "part":
-		fs.Freeze(mi.Mountpoint)
+		err = fs.Freeze(mi.Mountpoint)
 	case "lvm":
-		lvm.Suspend(mi.BlockDevice)
+		err = lvm.Suspend(mi.BlockDevice)
 	default:
 	}
+	return err
 }
