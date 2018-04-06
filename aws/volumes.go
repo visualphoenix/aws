@@ -15,7 +15,7 @@ type VolumeInfo struct {
 	State string
 	InstanceID string
 	VolumeID string
-	Tags map[string]string
+	Tags TagMap
 }
 
 // GetAttachedVolumes queries an aws instance for the attached volumes and returns a list of VolumeInfo
@@ -38,11 +38,7 @@ func GetAttachedVolumes(e *ec2.EC2, instanceID string) ([]VolumeInfo, error) {
 
 	for _, volume := range volumes.Volumes {
 		if len(volume.Attachments) == 1 {
-			tags := make(map[string]string)
-			tags["Name"] = ""
-			for _,tag := range volume.Tags {
-				tags[*tag.Key] = *tag.Value
-			}
+			tags := NewTagMap(volume.Tags)
 			device, err := getDevice(*volume.Attachments[0].Device)
 			if err != nil {
 				return results, err

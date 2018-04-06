@@ -104,6 +104,7 @@ func init() {
 	SetLogger(defaultLogger{logger: log.New(os.Stderr, "", log.LstdFlags)})
 }
 
+// SetLogger overwrites the default logger
 func SetLogger(l aws.Logger) {
 	customLogger = l
 }

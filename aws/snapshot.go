@@ -9,7 +9,7 @@ import (
 type SnapshotInfo struct {
 	VolumeID string
 	Description string
-	Tags map[string]string
+	Tags TagMap
 	DryRun bool
 }
 
@@ -21,17 +21,9 @@ func CreateSnapshot(e *ec2.EC2, s SnapshotInfo) (*ec2.Snapshot, error) {
 		TagSpecifications: []*ec2.TagSpecification{
 			{
 				ResourceType: _aws.String(ec2.ResourceTypeSnapshot),
-				Tags:         getTags(s.Tags),
+				Tags:         s.Tags.ToEC2Tags(),
 			},
 		},
 		DryRun: _aws.Bool(s.DryRun),
 	})
-}
-
-func getTags(tags map[string]string) []*ec2.Tag {
-	var result []*ec2.Tag
-	for k, v := range tags {
-		result = append(result, &ec2.Tag{Key: _aws.String(k), Value: _aws.String(v)})
-	}
-	return result
 }
