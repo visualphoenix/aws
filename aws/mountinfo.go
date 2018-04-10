@@ -1,10 +1,13 @@
 package aws
+// Copyright 2018 Raymond Barbiero. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
 import (
 	"fmt"
-	"github.com/visualphoenix/disk-go/lsblk"
 	"github.com/visualphoenix/disk-go/fs"
 	"github.com/visualphoenix/disk-go/lvm"
+	"github.com/visualphoenix/disk-go/lsblk"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
@@ -17,7 +20,9 @@ type MountInfo struct {
 	PhysicalDevices []VolumeInfo
 }
 
-func getVolume(volumes []VolumeInfo, disk string) VolumeInfo {
+type blockDeviceDiskMap map[string][]VolumeInfo
+
+func getDiskVolumeInfo(volumes []VolumeInfo, disk string) VolumeInfo {
 	for _, v := range volumes {
 		if v.Device == disk {
 			return v
@@ -29,10 +34,11 @@ func getVolume(volumes []VolumeInfo, disk string) VolumeInfo {
 // GetMountInfoFromVolumes returns a list of MountInfo from lsblk output and a list of attached aws volumes
 func GetMountInfoFromVolumes(l lsblk.Lsblk, volumes []VolumeInfo) []MountInfo {
 	var result []MountInfo;
-	mountpointToDisks := make(map[string][]VolumeInfo)
+	blockDeviceToDisks := make(blockDeviceDiskMap)
 	for _, d := range l.Disks {
-		if d.Disk.Mountpoint != "" {
-			if _, ok := mountpointToDisks[d.Disk.Mountpoint]; !ok {
+		disk := getDiskVolumeInfo(volumes,d.Disk.Device)
+		if d.Disk.Fstype != "LVM2_member" && d.Disk.Fstype != "" {
+			if _, ok := blockDeviceToDisks[d.Disk.Device]; !ok {
 				m := MountInfo {
 					Mountpoint: d.Disk.Mountpoint,
 					FilesystemType: d.Disk.Fstype,
@@ -41,11 +47,11 @@ func GetMountInfoFromVolumes(l lsblk.Lsblk, volumes []VolumeInfo) []MountInfo {
 				}
 				result = append(result, m)
 			}
-			mountpointToDisks[d.Disk.Mountpoint] =  append(mountpointToDisks[d.Disk.Mountpoint],getVolume(volumes,d.Disk.Device))
+			blockDeviceToDisks[d.Disk.Device] =  append(blockDeviceToDisks[d.Disk.Device], disk)
 		}
 		for _, p := range d.Parts {
-			if p.Mountpoint != "" {
-				if _, ok := mountpointToDisks[p.Mountpoint]; !ok {
+			if p.Fstype != "LVM2_member" {
+				if _, ok := blockDeviceToDisks[p.Device]; !ok {
 					m := MountInfo {
 						Mountpoint: p.Mountpoint,
 						FilesystemType: p.Fstype,
@@ -54,12 +60,12 @@ func GetMountInfoFromVolumes(l lsblk.Lsblk, volumes []VolumeInfo) []MountInfo {
 					}
 					result = append(result, m)
 				}
-				mountpointToDisks[p.Mountpoint] = append(mountpointToDisks[p.Mountpoint],getVolume(volumes,d.Disk.Device))
+				blockDeviceToDisks[p.Device] = append(blockDeviceToDisks[p.Device], disk)
 			}
 		}
 	}
 	for i := range result {
-		disks := mountpointToDisks[result[i].Mountpoint]
+		disks := blockDeviceToDisks[result[i].BlockDevice]
 		result[i].PhysicalDevices = disks
 	}
 	return result
@@ -83,7 +89,9 @@ func GetMountInfoFrom(service *ec2.EC2, instanceID string) ([]MountInfo, error) 
 func (mi MountInfo) Suspend() error {
 	var err error
 	if mi.BlockDeviceType == "disk" || mi.BlockDeviceType == "part" {
-		err = fs.Freeze(mi.Mountpoint)
+		if mi.Mountpoint != "" {
+			err = fs.Freeze(mi.Mountpoint)
+		}
 	} else if mi.BlockDeviceType == "lvm" {
 		err = lvm.Suspend(mi.BlockDevice)
 	}
@@ -94,7 +102,9 @@ func (mi MountInfo) Suspend() error {
 func (mi MountInfo) Resume() error {
 	var err error
 	if mi.BlockDeviceType == "disk" || mi.BlockDeviceType == "part" {
-		err = fs.Unfreeze(mi.Mountpoint)
+		if mi.Mountpoint != "" {
+			err = fs.Unfreeze(mi.Mountpoint)
+		}
 	} else if mi.BlockDeviceType == "lvm" {
 		err = lvm.Resume(mi.BlockDevice)
 	}
